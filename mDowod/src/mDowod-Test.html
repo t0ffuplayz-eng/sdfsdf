@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title></title>
+
+
+<script language="javascript">
+
+        /**
+         * Sprawdza czy cyfra kontrolna numeru dowodu/mDowodu/paszportu/karty pobytu jest poprawna.
+         * Zgodna ze specyfikacjami ISO/IEC 7501-1:1997,
+         * ICAO 9303    https://www.icao.int/Meetings/TAG-MRTD/TagMrtd22/TAG-MRTD-22_WP03-rev.pdf  strona 21
+         * ICAO 9303-3  https://www.icao.int/publications/Documents/9303_p3_cons_en.pdf#search=9303%2D3 strona 19
+         * @param {string} docNumber
+         * @returns
+         */
+        // eslint-disable-next-line no-unused-vars
+        function IsDocumentsCheckDigitOK(docNumber) {
+            /* eslint-disable vars-on-top */
+            /// uwzględnia mDowód ABCD12345, Dowód ABC123456, Karta Pobytu AB1234567
+            var validNumbersRegex = /(^([A-Z]{4}[0-9]{5})$)|(^([A-Z]{3}[0-9]{6})$)|(^([A-Z]{2}[0-9]{7})$)/;
+
+            var numberToCheck = docNumber.replace(/\s+/g, "");
+            if (numberToCheck.match(validNumbersRegex) === null) {
+                return false; // Niepoprawny
+            }
+
+            numberToCheck = numberToCheck.toUpperCase();
+            var letterValues = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            var weights = [7, 3, 1, 7, 3, 1, 7, 3, 1];
+
+            function getLetterValue(letter) {
+                return letterValues.indexOf(letter);
+            }
+
+            var seriaNumberRegex = /^([A-Z]{2,4})([0-9])([0-9]{4,6})$/;
+            var matches = numberToCheck.match(seriaNumberRegex);
+
+            var withoutControlDigit = matches[1] + matches[3]; // pomijamy cyfrę kontrolną
+            var currentCheckControl = matches[2];
+            var checkSum = 0;
+            for (var counter = 0; counter < withoutControlDigit.length; counter += 1) {
+                checkSum += getLetterValue(withoutControlDigit.charAt(counter)) * weights[counter];
+            }
+
+            return parseInt(currentCheckControl, 10) === (checkSum % 10);
+        }
+
+        function GetControlDigit(docNumber, steps) {
+            var numberToCheck = docNumber.replace(/\s+/g, "");
+
+            numberToCheck = numberToCheck.toUpperCase();
+            var letterValues = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            var weights = [7, 3, 1, 7, 3, 1, 7, 3, 1, 7, 3, 1];
+
+            function getLetterValue(letter) {
+                return letterValues.indexOf(letter);
+            }
+
+            var seriaNumberRegex = /^([A-Z]{2,4})([0-9])([0-9]{4,6})$/;
+            var matches = numberToCheck.match(seriaNumberRegex);
+			
+			if (matches === undefined || matches === null) {
+				return null;
+			}
+
+            var withoutControlDigit = matches[1] + matches[3]; // pomijamy cyfrę kontrolną
+
+            if (steps === undefined || steps === null) {
+                steps = { message: "" };
+            }
+
+            var checkSum = 0;
+            for (var counter = 0; counter < withoutControlDigit.length; counter += 1) {
+                var letter = withoutControlDigit[counter];
+                var letterValue = getLetterValue(letter);
+
+                if (steps.message.length > 0) {
+                    steps.message += " + ";
+                }
+
+                steps.message += "(<b style='color:blue;'>" + letter + "</b>↣ " + letterValue + "*<b>" + weights[counter] + "</b>)";
+
+                checkSum += letterValue * weights[counter];
+            }
+
+            steps.message += " = " + checkSum + " ↣ " + checkSum + " MOD 10 = <b style='color:blue;'>" + (checkSum % 10) + "</b>";
+
+            return checkSum % 10;
+        }
+
+        function getRandomIntInclusive(min, max) {
+            min = Math.ceil(min);
+            max = Math.floor(max);
+            return Math.floor(Math.random() * (max - min + 1) + min); // The maximum is inclusive and the minimum is inclusive
+        }
+
+        String.prototype.replaceAt = function (index, replacement) {
+            return this.substring(0, index) + replacement + this.substring(index + replacement.length);
+        }
+
+        function checkNumberDo() {
+            var controlDigit = NaN;
+            var currentDigit = NaN;
+            var message = "<br />";
+            var steps = { message: "" };
+            var numerToCheck = numerdo.value;
+
+
+            var isOk = IsDocumentsCheckDigitOK(numerToCheck);
+
+            try {
+                controlDigit = GetControlDigit(numerToCheck, steps);
+                message += "Wyliczona cyfra kontrolna: <b>" + controlDigit + "</b>";
+            } catch (oError) { }
+
+            try {
+                currentDigit = numerToCheck.replace(/\s+/g, "").match(/^([A-Z]{2,4})([0-9])([0-9]{4,6})$/)[2];
+                message += " obecna cyfra kontrolna to: <b>" + currentDigit + "</b>";
+            } catch (oError) { }
+
+            if (parseInt(controlDigit, 10) === parseInt(currentDigit, 10)) {
+                message += "<br />Cyfry kontrolne się zgadzają.";
+            } else {
+                message += "<br />Cyfry kontrolne się NIE zgadzają.";
+            }
+
+            if (isOk) {
+                message += "<br /><br />Numer [<b style='color: green;'>" + numerToCheck + "</b>] jest <b>poprawny</b>.";
+
+            } else {
+
+                message += "<br /><br />Numer [<b style='color: red;'>" + numerToCheck + "</b>] jest <b style='color: red;'>błędny</b>!<br />";
+
+                try {
+                    var numberWoSpaces = numerToCheck.replace(/\s+/g, "");
+
+                    if (numberWoSpaces.match(/(^(M[A-Z]{3}[0-9]{5})$)/) === null) {
+                        message += "<br />Numer nie jest zgodny z  szablonem mDowód: &nbsp;&nbsp;MABC12345";
+                    } else {
+                        message += "<br />Numer <b>JEST</b> zgodny z  szablonem mDowód: &nbsp;&nbsp;MABC12345";
+                    }
+                    if (numberWoSpaces.match(/(^([A-Z]{3}[0-9]{6})$)/) === null) {
+                        message += "<br />Numer nie jest zgodny z  szablonem Dowód: &nbsp;&nbsp;ABC123456";
+                    } else {
+                        message += "<br />Numer <b>JEST</b> zgodny z  szablonem Dowód: &nbsp;&nbsp;ABC123456";
+                    }
+                    if (numberWoSpaces.match(/(^([A-Z]{2}[0-9]{7})$)/) === null) {
+                        message += "<br />Numer nie jest zgodny z  szablonem Paszport / Karta Pobytu: AB1234567";
+                    } else {
+                        message += "<br />Numer <b>JEST</b> zgodny z  szablonem Paszport / Karta Pobytu: AB1234567";
+                    }
+
+                } catch (oError) { }
+            }
+
+
+            message += "<br /><h4>Kroki kalkulacji</h4>" + steps.message +"";
+
+            document.getElementById("resultdo").innerHTML = message;
+
+        }
+                		
+		function GenerujNumer(liczbaLiter, liczbaCyfr, literaPrefix, steps) {
+
+            var letterValues = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            
+            var numermDowodu =  literaPrefix !== undefined ? literaPrefix : "";
+			var counter = literaPrefix !== undefined ? 1 : 0;
+
+            for (counter; counter < liczbaLiter; counter += 1) {
+                var signNumber = getRandomIntInclusive(10, 35);
+				var letter = letterValues[signNumber];				
+                numermDowodu += letter;
+            }
+            for (var counter = 0; counter < liczbaCyfr; counter += 1) {
+                var signNumber = getRandomIntInclusive(0, 9);
+                numermDowodu += letterValues[signNumber];
+            }
+
+            var controlDigit = GetControlDigit(numermDowodu, steps);
+
+            numermDowodu = numermDowodu.substring(0, liczbaLiter) + controlDigit + numermDowodu.substring(liczbaLiter + 1);
+
+            return numermDowodu;
+        }
+		
+        function OnGenerujClick() {
+            var steps = { message: "" };
+            var message = "";
+
+            document.getElementById('newNumer').value = GenerujNumer(4, 5, "M", steps);
+
+            message += "<br /><h4>Kroki kalkulacji cyfry kontrolnej</h4>" + steps.message + "";
+
+            document.getElementById("resultinfo").innerHTML = message;
+        }
+
+	    function OnGenerujDowodClick() {
+	        var steps = { message: "" };
+	        var message = "";
+
+	        document.getElementById('newNumerDo').value = GenerujNumer(3, 6, undefined, steps);
+
+	        message += "<br /><h4>Kroki kalkulacji cyfry kontrolnej</h4>" + steps.message + "";
+
+	        document.getElementById("resultinfoDo").innerHTML = message;
+	    }
+
+	    function OnGenerujKarteClick() {
+	        var steps = { message: "" };
+	        var message = "";
+
+	        document.getElementById('newNumerKp').value = GenerujNumer(2, 7, undefined, steps);
+
+	        message += "<br /><h4>Kroki kalkulacji cyfry kontrolnej</h4>" + steps.message + "";
+
+	        document.getElementById("resultinfoKp").innerHTML = message;
+	    }
+
+    </script>
+</head>
+<body>
+    <h2>Tester i generator numeru mDowodu</h2>
+<pre>
+    Sprawdza czy cyfra kontrolna numeru dowodu/mDowodu/paszportu/karty pobytu jest poprawna.
+    Zgodna ze specyfikacjami ISO/IEC 7501-1:1997,
+    ICAO 9303    https://www.icao.int/Meetings/TAG-MRTD/TagMrtd22/TAG-MRTD-22_WP03-rev.pdf  strona 21
+    ICAO 9303-3  https://www.icao.int/publications/Documents/9303_p3_cons_en.pdf#search=9303%2D3 strona 19
+</pre>
+    <h3>Repozytorium GIT</h3>
+    <p>Repozytorium git z kodem weryfikatora cyfry kontrolnej znajduje się <a href="https://wrottfs/tfs/SCB/T1RKG/_git/mDowod">https://wrottfs/tfs/SCB/T1RKG/_git/mDowod</a></p>
+
+    <h3>Algorytm liczenia cyfry kontrolnej</h3>
+<pre>
+Literom przypisujemy liczby:
+  ——————————————————————————————————————————————————————————————————————————————  
+ |A ⁞B ⁞C ⁞ D⁞ E⁞ F⁞ G⁞ H⁞ I⁞ J⁞ K⁞ L⁞ M⁞ N⁞ O⁞ P⁞ Q⁞ R⁞ S⁞ T⁞ U⁞ V⁞ W⁞ X⁞ Y⁞ Z |
+ |10⁞11⁞12⁞13⁞14⁞15⁞16⁞17⁞18⁞19⁞20⁞21⁞22⁞23⁞24⁞25⁞26⁞27⁞28⁞29⁞30⁞31⁞32⁞33⁞34⁞35 |
+  —————————————————————————————————————————————————————————————————————————————— 
+</pre>
+<pre>
+Algorytm obliczenia cyfry kontrolnej (CK) dla serii MAAA i numeru kolejnego 23456
+
+  ———————————————————————————————————————————————————————————— 
+ |Dane      ⁞  M     A    A    A  CK   2    3    4    5 ⁞     |
+ |Wartości  ⁞  22   10   10   10  ▫▫   2    3    4    5 ⁞     |
+ |Wagi      ⁞   7    3    1    7  ▫▫   3    1    7    3 ⁞     |
+ |Iloczyny  ⁞ 154   30   10   70  ▫▫   6    3   28   15 ⁞     |
+ |————————————————————————————————————————————————————————————|
+ |Sumowanie ⁞ 154 + 30 + 10 + 70     + 6  + 3 + 28 + 15 = 316 |
+  ———————————————————————————————————————————————————————————— 
+
+ (22•7)+(10•3)+(10•1)+(10•7)+(2•3)+(3•1)+(4•7)+(5•3) = 316
+ CK ↣ 316 MOD 10 = 6
+
+Reszta z dzielenia 316 MOD 10 = 6  
+Reszta z dzielenia stanowi cyfrę kontrolną i umieszczamy ją za literami serii
+Otrzymujemy: MAAA 6 2345
+</pre>
+    <hr />
+    <h3>Tester numeru Dowodu / mDowodu / Paszportu / Karty pobytu</h3>
+    <div>
+        <div>
+            <label>Wprowadź numer: </label>
+            <input type="text" id="numerdo" />
+            <input type="button" id="check" onclick="checkNumberDo()" title="Sprawdź cyfrę kontrolną" value="Sprawdź" />
+        </div>
+        <div id="resultdo" style="padding: 8px;"></div>
+    </div>
+    <br />
+    <hr />
+    <h3>Generator numeru mDowodu</h3>
+    <div>
+        <div>
+            <input type="button" id="generuj" onclick="OnGenerujClick()" title="Generuj numer mDowodu" value="Generuj" />
+            <label>Wygenerowany numer: </label>
+            <input type="text" id="newNumer" readonly />
+        </div>
+        <div id="resultinfo" style="padding: 8px;"></div>
+    </div>
+    <hr />
+    <h3>Generator numeru zwykłego dowodu</h3>
+    <div>
+        <div>
+            <input type="button" id="generujDo" onclick="OnGenerujDowodClick()" title="Generuj numer mDowodu" value="Generuj" />
+            <label>Wygenerowany numer: </label>
+            <input type="text" id="newNumerDo" readonly />
+        </div>
+	    <div id="resultinfoDo" style="padding: 8px;"></div>
+    </div>
+	<hr />
+	<h3>Generator numeru karty pobytu</h3>
+	<div>
+		<div>
+			<input type="button" id="generujKp" onclick="OnGenerujKarteClick()" title="Generuj numer mDowodu" value="Generuj" />
+			<label>Wygenerowany numer: </label>
+			<input type="text" id="newNumerKp" readonly />
+		</div>
+		<div id="resultinfoKp" style="padding: 8px;"></div>
+	</div>
+    <hr />
+    <p>Informacje: <a href="mailto:Sebastian.Starba@santanderconsumer.pl">Sebastian Starba</a></p>
+
+</body>
+</html>
